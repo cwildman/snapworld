@@ -6,6 +6,7 @@ import urllib2
 import urllib
 import logging
 import random
+import struct
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] [%(process)d] [%(filename)s] [%(funcName)s] %(message)s')
 
@@ -234,6 +235,7 @@ def error(server, src_id, msg):
 def acquire_token(size=-1):
     broker_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     broker_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    broker_sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,struct.pack('ii', 1, 0))
     pid = os.getpid()
     try:
         # TODO(nkhadke): Make this dynamic via snapw config file
@@ -249,6 +251,7 @@ def acquire_token(size=-1):
             logging.critical("Error in acquiring token from broker")
             broker_sock.close()
             sys.exit(2)
+        broker_sock.shutdown(socket.SHUT_RDWR)
         broker_sock.close()
     except socket.error, (value,message):
         logging.critical("Error in connecting to broker: %s" % message)
@@ -262,6 +265,7 @@ def acquire_token(size=-1):
 def release_token():
     broker_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     broker_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    broker_sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,struct.pack('ii', 1, 0))
     pid = os.getpid()
     try:
         # TODO(nkhadke): Make this dynamic via snapw config file
@@ -276,6 +280,7 @@ def release_token():
             logging.critical("Error in releasing token to broker")
             broker_sock.close()
             sys.exit(2)
+        broker_sock.shutdown(socket.SHUT_RDWR)
         broker_sock.close()
     except socket.error, (value,message):
         logging.critical("Error in connecting to broker: %s" % message)
