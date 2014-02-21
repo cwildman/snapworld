@@ -7,10 +7,11 @@ HOST_PORT = (`python2.7 python/config.py snapw.config master`).strip().split(':'
 
 HOST = HOST_PORT[0]
 PORT = HOST_PORT[1]
+SUP_PORT = 9200
 
 SLEEPTIME = 10
 LFS = "/lfs/local/0/${USER}"
-HOST_N = 17
+HOST_N = 5
 
 ################################
 
@@ -68,7 +69,14 @@ end
 def pre_deploy_cleanup()
     sh "fs flushvolume -path ." # flush AFS cache
     cleanup = "rm -rf #{LFS}/supervisors/*; rm -rf #{LFS}/snapshot-*; rm -rf #{LFS}/master.log"
-    task_dsh(cleanup)
+    task_dsh2(cleanup)
+end
+
+def task_save_logs()
+    # Get the supervisor logs
+    sh2 "seq -f '%02g' 2 #{HOST_N} | { while read i; do scp ${USER}@iln$i:#{LFS}/supervisors/#{SUP_PORT}/execute/supervisor-sh-#{SUP_PORT}.log #{LFS}/supervisor-sh-#{SUP_PORT}-iln$i.log; done; }"
+    # Get the finish logs
+    sh2 "scp ${USER}@iln02:#{LFS}/supervisors/#{SUP_PORT}/output/*.txt #{LFS}/"
 end
 
 def task_deploy()
@@ -101,6 +109,10 @@ task :start do
     task_start(HOST, PORT)
 end
 
+task :save_logs do
+    task_save_logs()
+end
+
 
 task :stop do
     task_stop(HOST, PORT)
@@ -114,7 +126,7 @@ task :test do
     rescue
         sh2 "rake stop"
     end
-    sh2 "rake cleanup"
+    sh2 "rake kill"
     # sh "rm -rf bin/"
     
     sh2 "rake dshgrep[\"WARNING|ERROR|CRITICAL|traceback\"]"
@@ -122,9 +134,9 @@ task :test do
 end
 
 
-task :cleanup do
+task :kill do
     sh "ps x | egrep 'python|node' | grep -v grep | grep -v emacs | grep -v vim | awk '{print $1}'| xargs -r kill -SIGKILL"
-    killcmd_sup = Shellwords.escape("ps x | egrep 'python|node' | egrep -v 'vim|emacs|egrep' | awk '{print \\$1}' | xargs -r kill -SIGKILL")
+    killcmd_sup = Shellwords.escape("ps x | egrep 'python|node|SCREEN|reauth' | egrep -v 'vim|emacs|egrep' | awk '{print \\$1}' | xargs -r kill -SIGKILL")
     task_dsh2(killcmd_sup)
 end
 

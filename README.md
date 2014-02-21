@@ -47,6 +47,6 @@ Stopping
 
 To stop a job type do the following.
 
-    1. % rake cleanup
+    1. % rake kill
         This command will kill all of the processes running on all of the
       machines.
