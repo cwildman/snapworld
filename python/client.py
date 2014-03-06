@@ -7,6 +7,7 @@ import urllib
 import logging
 import random
 import struct
+import thread
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] [%(process)d] [%(filename)s] [%(funcName)s] %(message)s')
 
@@ -161,7 +162,7 @@ def messagevec(server, src, dst, Vec):
     # need_token = (content_length >= 1*1024*1024)
     need_token = True
 
-    if need_token: acquire_token(content_length)
+    if need_token: acquire_token('net',content_length)
 
     h = httplib.HTTPConnection(server)
     
@@ -193,7 +194,7 @@ def messagevec(server, src, dst, Vec):
 
     if not sw_ok:
         logging.error("Could not establish connection to dest: %s" % str(dst))
-        if need_token: release_token()
+        if need_token: release_token('net')
         raise socket.error("Could not establish connection to dest: %s" % str(dst))
 
     logging.debug("messagevec content-length: %d" % content_length)
@@ -212,7 +213,7 @@ def messagevec(server, src, dst, Vec):
     if r < 0:
         logging.warn("Snap.SendVec_TIntV returned with error %d" % r)
         h.close()
-        if need_token: release_token()
+        if need_token: release_token('net')
         raise socket.error("Send.SendVec_TIntV error")
 
     res = h.getresponse()
@@ -222,7 +223,7 @@ def messagevec(server, src, dst, Vec):
 
     h.close()
 
-    if need_token: release_token()
+    if need_token: release_token('net')
 
 @socket_retry
 def error(server, src_id, msg):
@@ -232,16 +233,19 @@ def error(server, src_id, msg):
     body = f.read()
     f.close()
 
-def acquire_token(size=-1):
+def acquire_token(type,size=-1):
+    #if (type == 'disk'): return
     broker_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     broker_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     broker_sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,struct.pack('ii', 1, 0))
     pid = os.getpid()
+    src_id = "%s-%d" % (pid, thread.get_ident());
+    logging.info(src_id)
     try:
         # TODO(nkhadke): Make this dynamic via snapw config file
         # broker_sock.connect(("127.0.0.1", 1341))
         broker_sock.connect(("127.0.0.1", 1337))
-        acq_cmd = "acquire|net|%d|%d\n" % (pid, size)
+        acq_cmd = "acquire|%s|%s|%d\n" % (type,src_id, size)
 
         broker_sock.send(acq_cmd)
         rv = broker_sock.recv(1024).strip()
@@ -262,16 +266,19 @@ def acquire_token(size=-1):
         sys.exit(2)
 
 
-def release_token():
+def release_token(type):
+    #if (type == 'disk'): return
     broker_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     broker_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     broker_sock.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER,struct.pack('ii', 1, 0))
     pid = os.getpid()
+    src_id = "%d-%d" % (pid, thread.get_ident());
+    logging.info(src_id)
     try:
         # TODO(nkhadke): Make this dynamic via snapw config file
         # broker_sock.connect(("127.0.0.1", 1341))
         broker_sock.connect(("127.0.0.1", 1337))
-        rel_cmd = "release|net|%d\n" % pid
+        rel_cmd = "release|%s|%s\n" % (type, src_id)
         broker_sock.send(rel_cmd)
         rv = broker_sock.recv(1024).strip()
         if rv == "RELEASED":

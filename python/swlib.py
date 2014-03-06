@@ -154,7 +154,9 @@ class SnapWorld:
     def GetMsg(self, name):
         msgpath = os.path.join(self.qin, name)
         f = open(msgpath, "r")
+        client.acquire_token('disk')
         s = f.read()
+        client.release_token('disk')
         f.close()
         msg = json.loads(s)
         return msg
@@ -178,7 +180,9 @@ class SnapWorld:
         except:
             return None
 
+        client.acquire_token('disk')
         s = f.read()
+        client.release_token('disk')
         f.close()
         d = json.loads(s)
 
@@ -190,7 +194,9 @@ class SnapWorld:
 
         f = open(fname,"w")
         s = json.dumps(d)
+        client.acquire_token('disk')
         f.write(s)
+        client.release_token('disk')
         f.close()
 
     def GetOutName(self, dstname):
@@ -231,7 +237,9 @@ class SnapWorld:
 
             if self.local:
                 f = open(fname,"w")
+                client.acquire_token('disk')
                 f.write(s)
+                client.release_token('disk')
                 f.close()
                 return
 

@@ -7,6 +7,7 @@ var Lazy = require('lazy');
 
 var PORT = 9500;
 var MAX_TOKENS = 4096;
+var MAX_DISK_TOKENS = 16;
 
 ////////////////////////////////////////////////////////////
 
@@ -44,7 +45,7 @@ var TokenType = function(type, max_tokens) {
   this.acquire = function(socket, srcID, size) {
     var token = new Token(socket, srcID, size);
     this.q.push(token);
-    console.log(str_time() + " Token requested for: " + srcID);
+    console.log(str_time() + " Token requested for: " + srcID + " " + this.type);
     this.process();
   }
 
@@ -60,7 +61,7 @@ var TokenType = function(type, max_tokens) {
       console.log(str_time() + " Token released for: " + srcID
           + ", Size: " + size_blocked + " MB"
           + ", Duration: " + duration.toString() + " s"
-          + ", Throughput: " + (size_blocked/duration) + " MB/s");
+          + ", Throughput: " + (size_blocked/duration) + " MB/s" + " " + this.type);
     } else {
       socket.end("ERROR: srcID not found\n");
       console.log("srcID " + srcID + " not found");
@@ -93,7 +94,11 @@ var Broker = function(types) {
   this.manager = {};
 
   for (var i=0; i<types.length; i++) {
-    this.manager[types[i]] = new TokenType(types[i], MAX_TOKENS);
+    if (types[i] == 'disk') {
+      this.manager[types[i]] = new TokenType(types[i], MAX_DISK_TOKENS);
+    } else {
+      this.manager[types[i]] = new TokenType(types[i], MAX_TOKENS);
+    }
   }
 
   this.acquire = function(socket, type, srcID, size) {
@@ -119,7 +124,7 @@ var Broker = function(types) {
 // SERVER
 ////////////////////////////////////////////////////////////
 
-var broker = new Broker(['net']);
+var broker = new Broker(['net','disk']);
 
 var server = net.createServer(function(socket) {
 
@@ -128,14 +133,14 @@ var server = net.createServer(function(socket) {
     // console.log("RECV > " + data);
     var tokens = data.split("|");
     var cmd = tokens[0];
+    var type = tokens[1];
+    socket.setNoDelay();
 
     if (cmd == 'acquire') {
-      var type = tokens[1];
       var srcID = tokens[2];
       var size = parseInt(tokens[3]);
       broker.acquire(socket, type, srcID, size);
     } else if (cmd == 'release') {
-      var type = tokens[1];
       var srcID = tokens[2];
       broker.release(socket, type, srcID);
     } else {
