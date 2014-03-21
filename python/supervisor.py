@@ -249,9 +249,7 @@ class Server(BaseHTTPServer.BaseHTTPRequestHandler):
                 while nleft > 0:
                     nread = min(102400, nleft)
                     body = self.rfile.read(nread)
-                    client.acquire_token('disk')
                     f.write(body)
-                    client.release_token('disk')
                     nleft -= len(body)
             except Exception as e:
                 logging.warn("file stream error: %s" % str(e))
